@@ -13,8 +13,12 @@ type IP struct {
 	net.IP
 }
 
-func ParseIP(ip string) IP {
-	return IP{net.ParseIP(ip)}
+func ParseIP(ip string) (*IP, error) {
+	addr := net.ParseIP(ip)
+	if len(addr) == 0 {
+		return nil, errors.New("Invalid IP format")
+	}
+	return &IP{addr}, nil
 }
 
 func (ip *IP) Scan(value interface{}) error {
@@ -24,7 +28,11 @@ func (ip *IP) Scan(value interface{}) error {
 		return err
 	}
 
-	ip.IP = net.ParseIP(nullStr.String)
+	parsed, err := ParseIP(nullStr.String)
+	if err != nil {
+		return err
+	}
+	*ip = *parsed
 	return nil
 }
 
