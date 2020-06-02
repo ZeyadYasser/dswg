@@ -1,7 +1,9 @@
 package dswg
 
 import (
+	"fmt"
 	"strings"
+	"database/sql"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -88,7 +90,12 @@ func (db *sqliteDB) GetLink(name string) (*Link, error) {
 		&postdown,
 	)
 	if err != nil {
-		return nil, err
+		switch err {
+		case sql.ErrNoRows:
+			return nil, fmt.Errorf("Link \"%v\" does not exist in database", name)
+		default:
+			return nil, err
+		}
 	}
 
 	link.PostUp = strings.Split(postup, "\n")
@@ -128,7 +135,7 @@ func (db *sqliteDB) UpdateLink(name string, link Link) error {
 
 	linkID, err := getLinkID(name, tx)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	postup := strings.Join(link.PostUp, "\n")
@@ -191,7 +198,12 @@ func (db *sqliteDB) RemoveLink(name string) error {
 	// This should cascade the delete to all associated entities
 	const deleteLinkStmt = "DELETE FROM links WHERE name = ?"
 	_, err := db.conn.Exec(deleteLinkStmt, name)
-	return err
+	switch err {
+	case sql.ErrNoRows:
+		return fmt.Errorf("Link \"%v\" does not exist in database", name)
+	default:
+		return err
+	}
 }
 
 func (db *sqliteDB) Close() error {

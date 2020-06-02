@@ -122,3 +122,13 @@ type Link struct {
 	PostDown			[]string
 	Forward				bool	`db:"forward"`
 }
+
+func (link Link) Attrs() *netlink.LinkAttrs {
+	attrs := netlink.NewLinkAttrs()
+	attrs.Name = link.Name
+	return &attrs
+}
+
+func (link Link) Type() string {
+	return "wireguard"
+}
