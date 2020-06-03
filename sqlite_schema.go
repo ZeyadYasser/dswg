@@ -64,19 +64,17 @@ CREATE TABLE IF NOT EXISTS [peers]
  [dns2]             VARCHAR NULL ,
 
 
- PRIMARY KEY([id], [link_id]) ,
+ PRIMARY KEY([id]) ,
  FOREIGN KEY([link_id]) REFERENCES [links]([id]) ON DELETE CASCADE,
  UNIQUE([name], [link_id])
 );
 
 CREATE TABLE IF NOT EXISTS [peer_allowed_ips]
 (
- [peer_id]      	INTEGER NOT NULL ,
- [link_id]      	INTEGER NOT NULL ,
  [ip_cidr] 			VARCHAR NOT NULL ,
+ [peer_id]      	INTEGER NOT NULL ,
 
 
- PRIMARY KEY([peer_id] , [link_id]) ,
- FOREIGN KEY([peer_id]) REFERENCES [peer]([id]) ON DELETE CASCADE,
- FOREIGN KEY([link_id]) REFERENCES [link]([id]) ON DELETE CASCADE
+ PRIMARY KEY([ip_cidr] , [peer_id]) ,
+ FOREIGN KEY([peer_id]) REFERENCES [peers]([id]) ON DELETE CASCADE
 );`
