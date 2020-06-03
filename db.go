@@ -6,5 +6,10 @@ type DB interface {
 	UpdateLink(name string, link Link) error
 	RemoveLink(name string) error
 
+	AddPeer(linkName string, peer Peer) error
+	GetPeer(linkName, peerName string) (*Peer, error)
+	UpdatePeer(linkName, peerName string, peer Peer) error
+	RemovePeer(linkName, peerName string) error
+
 	Close()	error
 }

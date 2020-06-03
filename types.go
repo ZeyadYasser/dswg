@@ -9,6 +9,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+
 type IP struct {
 	net.IP
 }
@@ -106,6 +107,40 @@ func (k Key) Value() (driver.Value, error) {
 	return driver.Value(k.String()), nil
 }
 
+type UDPAddr struct {
+	net.UDPAddr
+}
+
+func ParseUDP(addrStr string) (*UDPAddr, error) {
+	addr, err := net.ResolveUDPAddr("udp", addrStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UDPAddr{*addr}, nil
+}
+
+func (udp *UDPAddr) Scan(value interface{}) error {
+	var nullStr sql.NullString
+	err := nullStr.Scan(value)
+	if err != nil {
+		return err
+	}
+
+	addr, err := net.ResolveUDPAddr("udp", nullStr.String)
+	if err != nil {
+		return err
+	}
+
+	udp.UDPAddr = *addr
+
+	return nil
+}
+
+func (udp UDPAddr) Value() (driver.Value, error) {
+	return driver.Value(udp.String()), nil
+}
+
 type Link struct {
 	Name				string	`db:"name"`
 	MTU					int		`db:"mtu"`
@@ -131,4 +166,18 @@ func (link Link) Attrs() *netlink.LinkAttrs {
 
 func (link Link) Type() string {
 	return "wireguard"
+}
+
+
+// FUTURE FEATURE: Add postup & postdown cmds for peers
+type Peer struct {
+	Name				string		`db:"name"`
+	Enable				bool		`db:"enable"`
+	PublicKey			Key			`db:"public_key"`
+	PresharedKey		*Key		`db:"preshared_key"`
+	Endpoint			*UDPAddr	`db:"endpoint"`
+	AllowedIPs			[]IPNet
+	PersistentKeepalive	int			`db:"keepalive"`
+	DNS1				*IP			`db:"dns1"`
+	DNS2				*IP			`db:"dns2"`
 }

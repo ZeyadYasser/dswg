@@ -139,7 +139,8 @@ func TestKeyScanValid(t *testing.T) {
 
 	key := Key{}
 	err := key.Scan("GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=")
-	
+	assert.Nil(err)
+
 	expectedKey, err := wgtypes.ParseKey("GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=")
 
 	assert.Nil(err)
@@ -164,4 +165,57 @@ func TestKeyValue(t *testing.T) {
 	value, err := key.Value() 
 	assert.Nil(err)
 	assert.Equal(value.(string), "GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=")
+}
+
+
+func TestParseUDPAddrValid(t *testing.T) {
+	assert := assert.New(t)
+	
+	udp, err := ParseUDP("192.168.0.200:42069")
+
+	assert.Nil(err)
+	assert.Equal(udp.UDPAddr.Port, 42069)
+	assert.Equal(byte(192), udp.UDPAddr.IP[12])
+	assert.Equal(byte(168), udp.UDPAddr.IP[13])
+	assert.Equal(byte(0), udp.UDPAddr.IP[14])
+	assert.Equal(byte(200), udp.UDPAddr.IP[15])
+}
+
+func TestParseUDPAddrInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	_, err := ParseUDP("192.168.0.200:c")
+
+	assert.NotNil(err)
+}
+
+func TestUDPAddrScanValid(t *testing.T) {
+	assert := assert.New(t)
+
+	udp := UDPAddr{}
+	err := udp.Scan("192.168.0.69:89")
+	assert.Nil(err)
+	
+	udpExpected, err := net.ResolveUDPAddr("udp", "192.168.0.69:89")
+
+	assert.Equal(udp.UDPAddr, *udpExpected)
+}
+
+func TestUDPAddrScanInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	udp := UDPAddr{}
+	err := udp.Scan("192.168.0.69")
+	assert.NotNil(err)
+}
+
+func TestUDPAddrValue(t *testing.T) {
+	assert := assert.New(t)
+
+	udp, err := ParseUDP("10.66.0.1:420")
+	assert.Nil(err)
+	
+	value, err := udp.Value() 
+	assert.Nil(err)
+	assert.Equal(value.(string), "10.66.0.1:420")
 }

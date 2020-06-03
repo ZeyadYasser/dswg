@@ -46,7 +46,7 @@ func (db *sqliteDB) AddLink(link Link) error {
 
 	linkID, err := getLinkID(link.Name, tx)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	const insertIPStmt = `
@@ -109,19 +109,9 @@ func (db *sqliteDB) GetLink(name string) (*Link, error) {
 	const selectIPsStmt = `
 		SELECT ip_cidr FROM link_allowed_ips
 		WHERE link_id = ?`
-	var allowedIPs []string
-	err = db.conn.Select(&allowedIPs, selectIPsStmt, linkID)
+	err = db.conn.Select(&link.DefaultAllowedIPs, selectIPsStmt, linkID)
 	if err != nil {
 		return nil, err
-	}
-
-	link.DefaultAllowedIPs = make([]IPNet, len(allowedIPs))
-	for i := range allowedIPs {
-		ip, err := ParseIPNet(allowedIPs[i])
-		if err != nil {
-			return nil, err
-		}
-		link.DefaultAllowedIPs[i] = *ip
 	}
 
 	return &link, nil
@@ -206,6 +196,178 @@ func (db *sqliteDB) RemoveLink(name string) error {
 	}
 }
 
+func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
+	tx, err := db.conn.Beginx()
+	if err != nil {
+		return err
+	}
+
+	linkID, err := getLinkID(linkName, tx)
+	if err != nil {
+		return err
+	}
+
+	// Last position is for the link ID
+	const insertPeerStmt = `
+		INSERT INTO peers (
+			name, enable, public_key,
+			preshared_key, endpoint,
+			keepalive, dns1, dns2, link_id
+		) VALUES (
+			:name, :enable, :public_key,
+			:preshared_key, :endpoint,
+			:keepalive, :dns1, :dns2, ?)`
+	query, args, err := sqlx.Named(insertPeerStmt, &peer)
+	if err != nil {
+		return err
+	}
+
+	args = append(args, linkID)
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+
+	peerID, err := getPeerID(linkID, peer.Name, tx)
+	if err != nil {
+		return err
+	}
+
+	const insertIPStmt = `
+		INSERT INTO peer_allowed_ips
+		(ip_cidr, peer_id) VALUES (?,?)`
+	for _, ip := range peer.AllowedIPs {
+		_, err := tx.Exec(insertIPStmt, ip, peerID)
+		if err != nil {
+			fmt.Println("a7a")
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (db *sqliteDB) GetPeer(linkName, peerName string) (*Peer, error) {
+	linkID, err := getLinkID(linkName, db.conn)
+	if err != nil {
+		return nil, err
+	}
+
+	const selectPeerStmt = `
+		SELECT
+			name, enable, public_key,
+			preshared_key, endpoint,
+			keepalive, dns1, dns2
+		FROM peers
+		WHERE link_id = ? AND name = ?`
+
+	var peer Peer
+	err = db.conn.Get(&peer, selectPeerStmt, linkID, peerName)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, fmt.Errorf("Peer \"%v\" does not exist in database", peerName)
+		default:
+			return nil, err
+		}
+	}
+
+	peerID, err := getPeerID(linkID, peerName, db.conn)
+	if err != nil {
+		return nil, err
+	}
+
+	const selectIPsStmt = `
+		SELECT ip_cidr FROM peer_allowed_ips
+		WHERE peer_id = ?`
+	err = db.conn.Select(&peer.AllowedIPs, selectIPsStmt, peerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &peer, nil
+}
+
+func (db *sqliteDB) UpdatePeer(linkName, peerName string, peer Peer) error {
+	tx, err := db.conn.Beginx()
+	if err != nil {
+		return err
+	}
+
+	linkID, err := getLinkID(linkName, tx)
+	if err != nil {
+		return err
+	}
+
+	peerID, err := getPeerID(linkID, peerName, tx)
+	if err != nil {
+		return err
+	}
+
+	const updateStmt = `
+		UPDATE peers
+		SET name = :name,
+			enable = :enable,
+			public_key = :public_key,
+			preshared_key = :preshared_key,
+			endpoint = :endpoint,
+			keepalive = :keepalive,
+			dns1 = :dns1,
+			dns2 = :dns2
+		WHERE
+			id = ?`
+
+	query, args, err := sqlx.Named(updateStmt, &peer)
+	if err != nil {
+		return err
+	}
+
+	args = append(args, peerID)
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+
+	// Delete old allowed ips
+	const deleteIPsStmt = `
+		DELETE FROM peer_allowed_ips
+		WHERE peer_id = ?`
+	_, err = tx.Exec(deleteIPsStmt, peerID)
+	if err != nil {
+		return err
+	}
+
+	// Insert new allowed ips
+	const insertIPStmt = `
+		INSERT INTO peer_allowed_ips
+		(ip_cidr, peer_id) VALUES (?,?)`
+	for _, ip := range peer.AllowedIPs {
+		_, err := tx.Exec(insertIPStmt, ip, peerID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (db *sqliteDB) RemovePeer(linkName, peerName string) error {
+	linkID, err := getLinkID(linkName, db.conn)
+	if err != nil {
+		return err
+	}
+
+	// This should cascade the delete to all associated IPs
+	const deletePeerStmt = "DELETE FROM peers WHERE link_id = ? AND name = ?"
+	_, err = db.conn.Exec(deletePeerStmt, linkID, peerName)
+	switch err {
+	case sql.ErrNoRows:
+		return fmt.Errorf("Peer \"%v\" does not exist in database", peerName)
+	default:
+		return err
+	}
+}
+
 func (db *sqliteDB) Close() error {
 	return db.conn.Close()
 }
@@ -215,6 +377,18 @@ func getLinkID(name string, q sqlx.Queryer) (int64, error) {
 
 	var id int64
 	err := sqlx.Get(q, &id, selectStmt, name)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
+}
+
+func getPeerID(linkID int64, peerName string, q sqlx.Queryer) (int64, error) {
+	const selectStmt = "SELECT id FROM peers WHERE link_id = ? AND name = ?"
+
+	var id int64
+	err := sqlx.Get(q, &id, selectStmt, linkID, peerName)
 	if err != nil {
 		return 0, err
 	}
