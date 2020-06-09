@@ -4,6 +4,7 @@ package dswg
 import (
 	"fmt"
 	"net"
+	"time"
 	"errors"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -101,6 +102,13 @@ func (c *Client) ActivateLink(name string) error {
 	}
 	
 	// TODO: Execute PostUp commands here
+
+	link.Enable = true
+	err = c.db.UpdateLink(link.Name, *link)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -114,6 +122,12 @@ func (c *Client) DeactivateLink(name string) error {
 	}
 
 	err = netlink.LinkSetDown(*link)
+	if err != nil {
+		return err
+	}
+
+	link.Enable = false
+	err = c.db.UpdateLink(link.Name, *link)
 	if err != nil {
 		return err
 	}
@@ -235,6 +249,150 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 	return nil
 }
 
+func (c *Client) AddPeer(linkName string, peer Peer) error {
+	if p, _ := c.db.GetPeer(linkName, peer.Name); p != nil {
+		return fmt.Errorf("Peer name \"%v\" already exists in database", peer.Name)
+	}
+
+	if err := validPeer(peer); err != nil {
+		return err
+	}
+
+	err := c.db.AddPeer(linkName, peer)
+	if err != nil {
+		return err
+	}
+
+	if isLoaded(linkName) && peer.Enable {
+		err = c.ActivatePeer(linkName, peer.Name)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) RemovePeer(linkName, peerName string) error {
+	if isLoaded(linkName) {
+		err := c.DeactivatePeer(linkName, peerName)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := c.db.RemovePeer(linkName, peerName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) ActivatePeer(linkName, peerName string) error {
+	if !isLoaded(linkName) {
+		return fmt.Errorf("Couldn't find wireguard link %v in the kernel", linkName)
+	}
+
+	peer, err := c.db.GetPeer(linkName, peerName)
+	if err != nil {
+		return err
+	}
+
+	var preshared *wgtypes.Key
+	if peer.PresharedKey != nil {
+		preshared = &peer.PresharedKey.Key
+	}
+	keepalive := time.Duration(peer.PersistentKeepalive)
+	allowedIPs := make([]net.IPNet, len(peer.AllowedIPs))
+	for i := range peer.AllowedIPs {
+		allowedIPs[i] = peer.AllowedIPs[i].IPNet
+	}
+	peerConfig := wgtypes.PeerConfig{
+		PublicKey: peer.PublicKey.Key,
+		PresharedKey: preshared,
+		Endpoint: &peer.Endpoint.UDPAddr,
+		PersistentKeepaliveInterval: &keepalive,
+		ReplaceAllowedIPs: true,
+		AllowedIPs: allowedIPs,
+	}
+
+	devConfig := wgtypes.Config{
+		Peers: []wgtypes.PeerConfig{peerConfig},
+	}
+
+	err = c.wg.ConfigureDevice(linkName, devConfig)
+	if err != nil {
+		return err
+	}
+
+	peer.Enable = true
+	err = c.db.UpdatePeer(linkName, peerName, *peer)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) DeactivatePeer(linkName, peerName string) error {
+	if !isLoaded(linkName) {
+		return fmt.Errorf("Couldn't find wireguard link %v in the kernel", linkName)
+	}
+
+	peer, err := c.db.GetPeer(linkName, peerName)
+	if err != nil {
+		return err
+	}
+
+	peerConfig := wgtypes.PeerConfig{
+		PublicKey: peer.PublicKey.Key,
+		Remove: true,
+	}
+
+	devConfig := wgtypes.Config{
+		Peers: []wgtypes.PeerConfig{peerConfig},
+	}
+
+	err = c.wg.ConfigureDevice(linkName, devConfig)
+	if err != nil {
+		return err
+	}
+
+	peer.Enable = false
+	err = c.db.UpdatePeer(linkName, peerName, *peer)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) UpdatePeer(linkName, peerName string, peer Peer) error {
+	if err := validPeer(peer); err != nil {
+		return err
+	}
+
+	err := c.DeactivatePeer(linkName, peerName)
+	if err != nil {
+		return err
+	}
+	
+	err = c.db.UpdatePeer(linkName, peerName, peer)
+	if err != nil {
+		return err
+	}
+
+	if isLoaded(linkName) && peer.Enable {
+		err = c.ActivatePeer(linkName, peer.Name)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func validLink(link Link) error {
 	if len(link.Name) == 0 {
 		return errors.New("Link name cannot be empty")
@@ -247,10 +405,18 @@ func validLink(link Link) error {
 	return nil
 }
 
+func validPeer(peer Peer) error {
+	if len(peer.Name) == 0 {
+		return errors.New("Peer name cannot be empty")
+	}
+
+	return nil
+}
+
 // Indicates whether the link is added to the kernel or not.
 func isLoaded(name string) bool {
 	netInterface, _ := netlink.LinkByName(name)
-	return netInterface != nil
+	return netInterface != nil && netInterface.Type() == "wireguard"
 }
 
 func NewClient(db DB) (*Client, error) {

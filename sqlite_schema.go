@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS [peers]
 
  PRIMARY KEY([id]) ,
  FOREIGN KEY([link_id]) REFERENCES [links]([id]) ON DELETE CASCADE,
- UNIQUE([name], [link_id])
+ UNIQUE([name], [link_id]),
+ UNIQUE([public_key], [link_id])
 );
 
 CREATE TABLE IF NOT EXISTS [peer_allowed_ips]

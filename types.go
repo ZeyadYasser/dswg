@@ -177,7 +177,7 @@ type Peer struct {
 	PresharedKey		*Key		`db:"preshared_key"`
 	Endpoint			*UDPAddr	`db:"endpoint"`
 	AllowedIPs			[]IPNet
-	PersistentKeepalive	int			`db:"keepalive"`
+	PersistentKeepalive	int64		`db:"keepalive"`
 	DNS1				*IP			`db:"dns1"`
 	DNS2				*IP			`db:"dns2"`
 }
