@@ -13,7 +13,8 @@ import (
 
 type Client struct {
 	db	DB
-	wg	wgctrl.Client
+	wg	*wgctrl.Client
+	ns	*netlink.Handle
 }
 
 
@@ -24,7 +25,7 @@ func (c *Client) AddLink(link Link) error {
 		return fmt.Errorf("Link name \"%v\" already exists in database", link.Name)
 	}
 
-	if ln, _ := netlink.LinkByName(link.Name); ln != nil {
+	if ln, _ := c.ns.LinkByName(link.Name); ln != nil {
 		return fmt.Errorf(
 			"Link name already exists in the kernel, " +
 			"please delete it first using `ip link delete %v`", link.Name)
@@ -57,8 +58,8 @@ func (c *Client) RemoveLink(name string) error {
 		return err
 	}
 
-	if isLoaded(name) {
-		err = netlink.LinkDel(*link)
+	if c.isLoaded(name) {
+		err = c.ns.LinkDel(*link)
 		if err != nil {
 			return err
 		}
@@ -82,8 +83,8 @@ func (c *Client) ActivateLink(name string) error {
 		return err
 	}
 
-	if !isLoaded(name) {
-		err := netlink.LinkAdd(link)
+	if !c.isLoaded(name) {
+		err := c.ns.LinkAdd(link)
 		if err != nil {
 			return err
 		}
@@ -96,7 +97,7 @@ func (c *Client) ActivateLink(name string) error {
 
 	// TODO: add peers here
 
-	err = netlink.LinkSetUp(*link)
+	err = c.ns.LinkSetUp(*link)
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func (c *Client) DeactivateLink(name string) error {
 		return err
 	}
 
-	err = netlink.LinkSetDown(*link)
+	err = c.ns.LinkSetDown(*link)
 	if err != nil {
 		return err
 	}
@@ -147,7 +148,7 @@ func (c *Client) UpdateLink(name string, link Link) error {
 		return err
 	}
 
-	if isLoaded(name) {
+	if c.isLoaded(name) {
 		err := c.setLinkSystemConfig(name, link)
 		if err != nil {
 			return err
@@ -165,7 +166,7 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 		return err
 	}
 
-	netInterface, err := netlink.LinkByName(name)
+	netInterface, err := c.ns.LinkByName(name)
 	if err != nil {
 		return fmt.Errorf("Couldn't find link %v in the kernel", link.Name)
 	}
@@ -177,7 +178,7 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 	interfaceUp := (netInterface.Attrs().Flags & net.FlagUp) != 0
 	if interfaceUp {
 		// Interface must be down when changes are applied
-		err := netlink.LinkSetDown(netInterface)
+		err := c.ns.LinkSetDown(netInterface)
 		if err != nil {
 			return err
 		}
@@ -196,12 +197,12 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 
 	// TODO: Isolate in a separate function ex. updateLinkAddr(link)
 	// Delete older addreses associated with the link
-	addrList, err := netlink.AddrList(netInterface, netlink.FAMILY_ALL)
+	addrList, err := c.ns.AddrList(netInterface, netlink.FAMILY_ALL)
 	if err != nil {
 		return err
 	}
 	for _, addr := range addrList {
-		err := netlink.AddrDel(netInterface, &addr)
+		err := c.ns.AddrDel(netInterface, &addr)
 		if err != nil {
 			return err
 		}
@@ -212,7 +213,7 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 		addr := &netlink.Addr{
 			IPNet: &link.AddressIPv4.IPNet,
 		}
-		err := netlink.AddrAdd(netInterface, addr)
+		err := c.ns.AddrAdd(netInterface, addr)
 		if err != nil {
 			return err
 		}
@@ -222,25 +223,25 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 		addr := &netlink.Addr{
 			IPNet: &link.AddressIPv6.IPNet,
 		}
-		err := netlink.AddrAdd(netInterface, addr)
+		err := c.ns.AddrAdd(netInterface, addr)
 		if err != nil {
 			return err
 		}
 	}
 	
-	err = netlink.LinkSetMTU(netInterface, link.MTU)
+	err = c.ns.LinkSetMTU(netInterface, link.MTU)
 	if err != nil {
 		return err
 	}
 
-	err = netlink.LinkSetName(netInterface, link.Name)
+	err = c.ns.LinkSetName(netInterface, link.Name)
 	if err != nil {
 		return err
 	}
 
 	// Restore link state if it was up
 	if interfaceUp {
-		err := netlink.LinkSetUp(netInterface)
+		err := c.ns.LinkSetUp(netInterface)
 		if err != nil {
 			return err
 		}
@@ -263,7 +264,7 @@ func (c *Client) AddPeer(linkName string, peer Peer) error {
 		return err
 	}
 
-	if isLoaded(linkName) && peer.Enable {
+	if c.isLoaded(linkName) && peer.Enable {
 		err = c.ActivatePeer(linkName, peer.Name)
 		if err != nil {
 			return err
@@ -274,7 +275,7 @@ func (c *Client) AddPeer(linkName string, peer Peer) error {
 }
 
 func (c *Client) RemovePeer(linkName, peerName string) error {
-	if isLoaded(linkName) {
+	if c.isLoaded(linkName) {
 		err := c.DeactivatePeer(linkName, peerName)
 		if err != nil {
 			return err
@@ -290,7 +291,7 @@ func (c *Client) RemovePeer(linkName, peerName string) error {
 }
 
 func (c *Client) ActivatePeer(linkName, peerName string) error {
-	if !isLoaded(linkName) {
+	if !c.isLoaded(linkName) {
 		return fmt.Errorf("Couldn't find wireguard link %v in the kernel", linkName)
 	}
 
@@ -323,6 +324,7 @@ func (c *Client) ActivatePeer(linkName, peerName string) error {
 
 	err = c.wg.ConfigureDevice(linkName, devConfig)
 	if err != nil {
+		fmt.Println("Here")
 		return err
 	}
 
@@ -336,7 +338,7 @@ func (c *Client) ActivatePeer(linkName, peerName string) error {
 }
 
 func (c *Client) DeactivatePeer(linkName, peerName string) error {
-	if !isLoaded(linkName) {
+	if !c.isLoaded(linkName) {
 		return fmt.Errorf("Couldn't find wireguard link %v in the kernel", linkName)
 	}
 
@@ -383,7 +385,7 @@ func (c *Client) UpdatePeer(linkName, peerName string, peer Peer) error {
 		return err
 	}
 
-	if isLoaded(linkName) && peer.Enable {
+	if c.isLoaded(linkName) && peer.Enable {
 		err = c.ActivatePeer(linkName, peer.Name)
 		if err != nil {
 			return err
@@ -414,12 +416,18 @@ func validPeer(peer Peer) error {
 }
 
 // Indicates whether the link is added to the kernel or not.
-func isLoaded(name string) bool {
-	netInterface, _ := netlink.LinkByName(name)
+func (c *Client) isLoaded(name string) bool {
+	netInterface, _ := c.ns.LinkByName(name)
 	return netInterface != nil && netInterface.Type() == "wireguard"
 }
 
 func NewClient(db DB) (*Client, error) {
+	// Use current network namespace
+	handle, err := netlink.NewHandle()
+	if err != nil {
+		return nil, err
+	}
+
 	wg, err := wgctrl.New()
 	if err != nil {
 		return nil, err
@@ -427,7 +435,8 @@ func NewClient(db DB) (*Client, error) {
 
 	client := &Client{
 		db: db,
-		wg: *wg,
+		wg: wg,
+		ns: handle,
 	}
 
 	return client, nil
