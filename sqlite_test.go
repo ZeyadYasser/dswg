@@ -93,6 +93,35 @@ func TestDBUpdateLinkNotExist(t *testing.T) {
 	assert.NotNil(err)
 }
 
+func TestDBUpdateLinkDuplicateName(t *testing.T) {
+	assert := assert.New(t)
+
+	db := setupDB()
+	defer db.Close()
+
+	testlink1 := baseLink()
+	testlink1.Name = "testo-linko1"
+	testlink2 := baseLink()
+	testlink2.Name = "testo-linko2"
+
+	err := db.AddLink(testlink1)
+	assert.Nil(err)
+	err = db.AddLink(testlink2)
+	assert.Nil(err)
+
+	err = db.UpdateLink("testo-linko1", testlink2)
+	assert.NotNil(err)
+
+	// Assert that the invalid DB transaction did not apply
+	dblink1, err := db.GetLink("testo-linko1")
+	assert.Nil(err)
+	assert.Equal(testlink1, *dblink1)
+
+	dblink2, err := db.GetLink("testo-linko2")
+	assert.Nil(err)
+	assert.Equal(testlink2, *dblink2)
+}
+
 func TestDBRemoveLinkValid(t *testing.T) {
 	assert := assert.New(t)
 
@@ -244,6 +273,40 @@ func TestDBUpdatePeerNotExist(t *testing.T) {
 
 	err = db.UpdatePeer(testlink.Name, "peero-1", basePeer())
 	assert.NotNil(err)
+}
+
+func TestDBUpdatePeerDuplicateName(t *testing.T) {
+	assert := assert.New(t)
+
+	db := setupDB()
+	defer db.Close()
+
+	testpeer1 := basePeer()
+	testpeer1.Name = "peero-1"
+	testpeer2 := basePeer()
+	testpeer2.Name = "peero-2"
+	randkey, _ := ParseKey("RANDngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
+	testpeer2.PublicKey = *randkey
+	
+	testlink := baseLink()
+	err := db.AddLink(testlink)
+	assert.Nil(err)
+
+	err = db.AddPeer(testlink.Name, testpeer1)
+	assert.Nil(err)
+	err = db.AddPeer(testlink.Name, testpeer2)
+	assert.Nil(err)
+
+	err = db.UpdatePeer(testlink.Name, "peero-1", testpeer2)
+	assert.NotNil(err)
+	
+	dbpeer1, err := db.GetPeer(testlink.Name, "peero-1")
+	assert.Nil(err)
+	assert.Equal(testpeer1, *dbpeer1)
+	
+	dbpeer2, err := db.GetPeer(testlink.Name, "peero-2")
+	assert.Nil(err)
+	assert.Equal(testpeer2, *dbpeer2)
 }
 
 func TestDBRemovePeerValid(t *testing.T) {

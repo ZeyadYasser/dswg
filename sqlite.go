@@ -41,6 +41,9 @@ func (db *sqliteDB) AddLink(link Link) error {
 	args = append(args, postup, postdown)
 	_, err = tx.Exec(query, args...)
 	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
 		return err
 	}
 
@@ -55,6 +58,9 @@ func (db *sqliteDB) AddLink(link Link) error {
 	for _, ip := range link.DefaultAllowedIPs {
 		_, err := tx.Exec(insertIPStmt, ip, linkID)
 		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return rollbackErr
+			}
 			return err
 		}
 	}
@@ -158,6 +164,9 @@ func (db *sqliteDB) UpdateLink(name string, link Link) error {
 	args = append(args, postup, postdown, linkID)
 	_, err = tx.Exec(query, args...)
 	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
 		return err
 	}
 
@@ -167,6 +176,9 @@ func (db *sqliteDB) UpdateLink(name string, link Link) error {
 		WHERE link_id = ?`
 	_, err = tx.Exec(deleteIPsStmt, linkID)
 	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
 		return err
 	}
 
@@ -177,6 +189,9 @@ func (db *sqliteDB) UpdateLink(name string, link Link) error {
 	for _, ip := range link.DefaultAllowedIPs {
 		_, err := tx.Exec(insertIPStmt, ip, linkID)
 		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return rollbackErr
+			}
 			return err
 		}
 	}
@@ -185,15 +200,27 @@ func (db *sqliteDB) UpdateLink(name string, link Link) error {
 }
 
 func (db *sqliteDB) RemoveLink(name string) error {
-	linkID, err := getLinkID(name, db.conn)
+	tx, err := db.conn.Beginx()
+	if err != nil {
+		return err
+	}
+
+	linkID, err := getLinkID(name, tx)
 	if err != nil {
 		return err
 	}
 
 	// This should cascade the delete to all associated entities
 	const deleteLinkStmt = "DELETE FROM links WHERE id = ?"
-	_, err = db.conn.Exec(deleteLinkStmt, linkID)
-	return err
+	_, err = tx.Exec(deleteLinkStmt, linkID)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
@@ -225,6 +252,9 @@ func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
 	args = append(args, linkID)
 	_, err = tx.Exec(query, args...)
 	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
 		return err
 	}
 
@@ -239,6 +269,9 @@ func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
 	for _, ip := range peer.AllowedIPs {
 		_, err := tx.Exec(insertIPStmt, ip, peerID)
 		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return rollbackErr
+			}
 			return err
 		}
 	}
@@ -324,6 +357,9 @@ func (db *sqliteDB) UpdatePeer(linkName, peerName string, peer Peer) error {
 	args = append(args, peerID)
 	_, err = tx.Exec(query, args...)
 	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
 		return err
 	}
 
@@ -333,6 +369,9 @@ func (db *sqliteDB) UpdatePeer(linkName, peerName string, peer Peer) error {
 		WHERE peer_id = ?`
 	_, err = tx.Exec(deleteIPsStmt, peerID)
 	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
 		return err
 	}
 
@@ -343,6 +382,9 @@ func (db *sqliteDB) UpdatePeer(linkName, peerName string, peer Peer) error {
 	for _, ip := range peer.AllowedIPs {
 		_, err := tx.Exec(insertIPStmt, ip, peerID)
 		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return rollbackErr
+			}
 			return err
 		}
 	}
@@ -351,19 +393,31 @@ func (db *sqliteDB) UpdatePeer(linkName, peerName string, peer Peer) error {
 }
 
 func (db *sqliteDB) RemovePeer(linkName, peerName string) error {
-	linkID, err := getLinkID(linkName, db.conn)
+	tx, err := db.conn.Beginx()
 	if err != nil {
 		return err
 	}
-	peerID, err := getPeerID(linkID, peerName, db.conn)
+
+	linkID, err := getLinkID(linkName, tx)
+	if err != nil {
+		return err
+	}
+	peerID, err := getPeerID(linkID, peerName, tx)
 	if err != nil {
 		return err
 	}
 
 	// This should cascade the delete to all associated IPs
 	const deletePeerStmt = "DELETE FROM peers WHERE link_id = ? AND id = ?"
-	_, err = db.conn.Exec(deletePeerStmt, linkID, peerID)
-	return err
+	_, err = tx.Exec(deletePeerStmt, linkID, peerID)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return rollbackErr
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (db *sqliteDB) Close() error {
