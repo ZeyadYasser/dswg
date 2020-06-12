@@ -90,21 +90,16 @@ func (c *Client) ActivateLink(name string) error {
 		}
 	}
 
+	link.Enable = true
 	err = c.setLinkSystemConfig(link.Name, *link)
 	if err != nil {
 		return err
 	}
 
 	// TODO: add peers here
-
-	err = c.ns.LinkSetUp(*link)
-	if err != nil {
-		return err
-	}
 	
 	// TODO: Execute PostUp commands here
 
-	link.Enable = true
 	err = c.db.UpdateLink(link.Name, *link)
 	if err != nil {
 		return err
@@ -122,9 +117,11 @@ func (c *Client) DeactivateLink(name string) error {
 		return err
 	}
 
-	err = c.ns.LinkSetDown(*link)
-	if err != nil {
-		return err
+	if c.isLoaded(name) {
+		err = c.ns.LinkSetDown(*link)
+		if err != nil {
+			return err
+		}
 	}
 
 	link.Enable = false
@@ -154,6 +151,13 @@ func (c *Client) UpdateLink(name string, link Link) error {
 			return err
 		}
 	}
+	
+	if !c.isLoaded(name) && link.Enable {
+		err := c.ActivateLink(link.Name)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -175,13 +179,10 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 		return errors.New("Link must be of type wireguard")
 	}
 
-	interfaceUp := (netInterface.Attrs().Flags & net.FlagUp) != 0
-	if interfaceUp {
-		// Interface must be down when changes are applied
-		err := c.ns.LinkSetDown(netInterface)
-		if err != nil {
-			return err
-		}
+	// Interface must be down when changes are applied
+	err = c.ns.LinkSetDown(netInterface)
+	if err != nil {
+		return err
 	}
 
 	// Override wireguard configuration
@@ -239,8 +240,7 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 		return err
 	}
 
-	// Restore link state if it was up
-	if interfaceUp {
+	if link.Enable {
 		err := c.ns.LinkSetUp(netInterface)
 		if err != nil {
 			return err
@@ -324,7 +324,6 @@ func (c *Client) ActivatePeer(linkName, peerName string) error {
 
 	err = c.wg.ConfigureDevice(linkName, devConfig)
 	if err != nil {
-		fmt.Println("Here")
 		return err
 	}
 
@@ -419,6 +418,28 @@ func validPeer(peer Peer) error {
 func (c *Client) isLoaded(name string) bool {
 	netInterface, _ := c.ns.LinkByName(name)
 	return netInterface != nil && netInterface.Type() == "wireguard"
+}
+
+func (c *Client) Close() error {
+	if c.db != nil {
+		err := c.db.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.wg != nil {
+		err := c.wg.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.ns != nil {
+		c.ns.Delete()
+	}
+
+	return nil
 }
 
 func NewClient(db DB) (*Client, error) {
