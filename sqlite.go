@@ -185,15 +185,15 @@ func (db *sqliteDB) UpdateLink(name string, link Link) error {
 }
 
 func (db *sqliteDB) RemoveLink(name string) error {
-	// This should cascade the delete to all associated entities
-	const deleteLinkStmt = "DELETE FROM links WHERE name = ?"
-	_, err := db.conn.Exec(deleteLinkStmt, name)
-	switch err {
-	case sql.ErrNoRows:
-		return fmt.Errorf("Link \"%v\" does not exist in database", name)
-	default:
+	linkID, err := getLinkID(name, db.conn)
+	if err != nil {
 		return err
 	}
+
+	// This should cascade the delete to all associated entities
+	const deleteLinkStmt = "DELETE FROM links WHERE id = ?"
+	_, err = db.conn.Exec(deleteLinkStmt, linkID)
+	return err
 }
 
 func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
@@ -239,7 +239,6 @@ func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
 	for _, ip := range peer.AllowedIPs {
 		_, err := tx.Exec(insertIPStmt, ip, peerID)
 		if err != nil {
-			fmt.Println("a7a")
 			return err
 		}
 	}
@@ -356,16 +355,15 @@ func (db *sqliteDB) RemovePeer(linkName, peerName string) error {
 	if err != nil {
 		return err
 	}
-
-	// This should cascade the delete to all associated IPs
-	const deletePeerStmt = "DELETE FROM peers WHERE link_id = ? AND name = ?"
-	_, err = db.conn.Exec(deletePeerStmt, linkID, peerName)
-	switch err {
-	case sql.ErrNoRows:
-		return fmt.Errorf("Peer \"%v\" does not exist in database", peerName)
-	default:
+	peerID, err := getPeerID(linkID, peerName, db.conn)
+	if err != nil {
 		return err
 	}
+
+	// This should cascade the delete to all associated IPs
+	const deletePeerStmt = "DELETE FROM peers WHERE link_id = ? AND id = ?"
+	_, err = db.conn.Exec(deletePeerStmt, linkID, peerID)
+	return err
 }
 
 func (db *sqliteDB) Close() error {
