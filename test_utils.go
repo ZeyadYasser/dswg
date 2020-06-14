@@ -37,8 +37,9 @@ func basePeer() Peer {
 	endpoint, _ := ParseUDP("192.168.0.1:42064")
 	return Peer{
 		Name: "zoz-pc",
-		Enable: false,
+		Enable: true,
 		PublicKey: *key,
+		PresharedKey: key,
 		Endpoint: endpoint,
 		DNS1: dns1,
 		AllowedIPs: []IPNet{*addr1, *addr2},

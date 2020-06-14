@@ -374,12 +374,14 @@ func (c *Client) UpdatePeer(linkName, peerName string, peer Peer) error {
 		return err
 	}
 
-	err := c.DeactivatePeer(linkName, peerName)
-	if err != nil {
-		return err
+	if c.isLoaded(linkName) {
+		err := c.DeactivatePeer(linkName, peerName)
+		if err != nil {
+			return err
+		}
 	}
 	
-	err = c.db.UpdatePeer(linkName, peerName, peer)
+	err := c.db.UpdatePeer(linkName, peerName, peer)
 	if err != nil {
 		return err
 	}
