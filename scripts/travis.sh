@@ -11,4 +11,4 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd $DIR
 
 sudo vagrant up --provider=libvirt
-sudo vagrant ssh -c "cd dswg && sudo /usr/bin/go test -v"
+sudo vagrant ssh -c "cd dswg && sudo /usr/bin/go test -v -p=1"
