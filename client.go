@@ -96,13 +96,25 @@ func (c *Client) ActivateLink(name string) error {
 		return err
 	}
 
-	// TODO: add peers here
-	
 	// TODO: Execute PostUp commands here
 
 	err = c.db.UpdateLink(link.Name, *link)
 	if err != nil {
 		return err
+	}
+
+	peers, err := c.db.GetLinkPeers(link.Name)
+	if err != nil {
+		return err
+	}
+
+	for _, peer := range peers {
+		if peer.Enable {
+			err := c.ActivatePeer(link.Name, peer.Name)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -326,6 +338,8 @@ func (c *Client) ActivatePeer(linkName, peerName string) error {
 	if err != nil {
 		return err
 	}
+
+	// TODO: Add IPs to routing table
 
 	peer.Enable = true
 	err = c.db.UpdatePeer(linkName, peerName, *peer)

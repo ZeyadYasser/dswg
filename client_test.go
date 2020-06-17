@@ -280,7 +280,53 @@ func TestClientActivateLinkNotLoaded(t *testing.T) {
 	assert.Equal(testlink.FirewallMark, wglink.FirewallMark)
 }
 
-// TODO: Test activated peers and executed commands when link is activated
+func TestClientActivateLinkPeersActivated(t *testing.T) {
+	assert := assert.New(t)
+
+	// Create a new network namespace 
+	netns, _ := netns.New()
+	defer netns.Close()
+
+	client := baseClient()
+	defer client.Close()
+	
+	testlink := baseLink()
+	testlink.Enable = false
+
+	err := client.AddLink(testlink)
+	assert.Nil(err)
+
+	testpeer1 := basePeer()
+	testpeer1.Name = "peer1"
+	randkey, _ := ParseKey("RND1ngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
+	testpeer1.PublicKey = *randkey
+	err = client.db.AddPeer(testlink.Name, testpeer1)
+	assert.Nil(err)
+	
+	testpeer2 := basePeer()
+	testpeer2.Name = "peer2"
+	randkey, _ = ParseKey("RND2ngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
+	testpeer2.PublicKey = *randkey
+	err = client.db.AddPeer(testlink.Name, testpeer2)
+	assert.Nil(err)
+
+	err = client.ActivateLink(testlink.Name)
+	assert.Nil(err)
+
+	wglink, err := client.wg.Device(testlink.Name)
+	assert.Nil(err)
+	assert.Equal(len(wglink.Peers), 2)
+
+	wgpeers := make(map[string]bool)
+	for _, peer := range wglink.Peers {
+		wgpeers[peer.PublicKey.String()] = true
+	}
+
+	assert.True(wgpeers[testpeer1.PublicKey.String()])
+	assert.True(wgpeers[testpeer2.PublicKey.String()])
+}
+
+// TODO: Test executed commands when link is activated
 
 func TestClientDeactivateLinkNotExist(t *testing.T) {
 	assert := assert.New(t)
