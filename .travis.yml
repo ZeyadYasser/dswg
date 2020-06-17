@@ -1,0 +1,9 @@
+dist: bionic
+
+# Cache the big Vagrant boxes
+cache:
+  directories:
+  - /home/travis/.vagrant.d/boxes
+
+script:
+- bash scripts/travis.sh
