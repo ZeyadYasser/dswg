@@ -3,6 +3,7 @@ package dswg
 type DB interface {
 	AddLink(link Link) error
 	GetLink(name string) (*Link, error)
+	GetLinkPeers(name string) ([]Peer, error)
 	UpdateLink(name string, link Link) error
 	RemoveLink(name string) error
 

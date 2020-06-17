@@ -48,6 +48,23 @@ func TestDBAddLinkDuplicate(t *testing.T) {
 	assert.NotNil(err)
 }
 
+func TestDBGetLinkValid(t *testing.T) {
+	assert := assert.New(t)
+
+	db := setupDB()
+	defer db.Close()
+
+	testlink := baseLink()
+	testlink.Name = "link1"
+
+	err := db.AddLink(testlink)
+	assert.Nil(err)
+
+	dblink, err := db.GetLink("link1")
+	assert.Nil(err)
+	assert.Equal(testlink, *dblink)
+}
+
 func TestDBGetLinkNotExist(t *testing.T) {
 	assert := assert.New(t)
 
@@ -57,6 +74,54 @@ func TestDBGetLinkNotExist(t *testing.T) {
 	link, err := db.GetLink("linko")
 	assert.NotNil(err)
 	assert.Nil(link)
+}
+
+func TestDBGetLinkPeersValid(t *testing.T) {
+	assert := assert.New(t)
+
+	db := setupDB()
+	defer db.Close()
+
+	testlink := baseLink()
+	err := db.AddLink(testlink)
+	assert.Nil(err)
+	
+	testpeer1 := basePeer()
+	testpeer1.Name = "peer1"
+	randkey, _ := ParseKey("RND1ngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
+	testpeer1.PublicKey = *randkey
+	err = db.AddPeer(testlink.Name, testpeer1)
+	assert.Nil(err)
+	
+	testpeer2 := basePeer()
+	testpeer2.Name = "peer2"
+	randkey, _ = ParseKey("RND2ngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
+	testpeer2.PublicKey = *randkey
+	err = db.AddPeer(testlink.Name, testpeer2)
+	assert.Nil(err)
+
+	dbpeers, err := db.GetLinkPeers(testlink.Name)
+	assert.Nil(err)
+	assert.Equal(len(dbpeers), 2)
+
+	peers := make(map[string]Peer)
+	for _, peer := range dbpeers {
+		peers[peer.Name] = peer
+	}
+
+	assert.Equal(peers[testpeer1.Name], testpeer1)
+	assert.Equal(peers[testpeer2.Name], testpeer2)
+}
+
+func TestDBGetLinkPeersNotExist(t *testing.T) {
+	assert := assert.New(t)
+
+	db := setupDB()
+	defer db.Close()
+
+	peers, err := db.GetLinkPeers("linko")
+	assert.NotNil(err)
+	assert.Nil(peers)
 }
 
 func TestDBUpdateLinkValid(t *testing.T) {

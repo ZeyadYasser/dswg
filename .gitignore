@@ -1,2 +1,3 @@
 *.sqlite
 *.vagrant
+coverage.out

@@ -123,6 +123,33 @@ func (db *sqliteDB) GetLink(name string) (*Link, error) {
 	return &link, nil
 }
 
+func (db *sqliteDB) GetLinkPeers(name string) ([]Peer, error) {
+	linkID, err := getLinkID(name, db.conn)
+	if err != nil {
+		return nil, err
+	}
+
+	var peerNames []string
+	const selectPeerNamesStmt = `
+		SELECT name FROM peers
+		WHERE link_id = ?`
+	err = db.conn.Select(&peerNames, selectPeerNamesStmt, linkID)
+	if err != nil {
+		return nil, err
+	}
+
+	peers := make([]Peer, len(peerNames))
+	for i, peerName := range peerNames {
+		peer, err := db.GetPeer(name, peerName)
+		if err != nil {
+			return nil, err
+		}
+		peers[i] = *peer
+	}
+
+	return peers, nil
+}
+
 func (db *sqliteDB) UpdateLink(name string, link Link) error {
 	tx, err := db.conn.Beginx()
 	if err != nil {
