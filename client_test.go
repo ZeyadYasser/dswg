@@ -4,6 +4,7 @@ import (
 	"net"
 	"testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 )
 
@@ -768,6 +769,8 @@ func TestClientActivatePeerValid(t *testing.T) {
 
 	testpeer := basePeer()
 	testpeer.Enable = false
+	addr, _ := ParseIPNet("10.9.6.2/32")
+	testpeer.AllowedIPs = []IPNet{*addr}
 	err = client.AddPeer(testlink.Name, testpeer)
 	assert.Nil(err)
 
@@ -782,6 +785,15 @@ func TestClientActivatePeerValid(t *testing.T) {
 
 	wglink, _ = client.wg.Device(testlink.Name)
 	assert.Equal(len(wglink.Peers), 1)
+
+	// Assert that peer IPs are added to routing table
+	netInterface, _ := client.ns.LinkByName(testlink.Name)
+	routes, _ := client.ns.RouteList(netInterface, netlink.FAMILY_ALL)
+	kernelRoutes := make(map[string]bool)
+	for _, route := range routes {
+		kernelRoutes[route.Dst.String()] = true
+	}
+	assert.True(kernelRoutes["10.9.6.2/32"])
 }
 
 func TestClientDeactivatePeerLinkNotLoaded(t *testing.T) {

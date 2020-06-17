@@ -339,7 +339,22 @@ func (c *Client) ActivatePeer(linkName, peerName string) error {
 		return err
 	}
 
-	// TODO: Add IPs to routing table
+	netInterface, err := c.ns.LinkByName(linkName)
+	if err != nil {
+		return err
+	}
+	for _, ip := range allowedIPs {
+		route := &netlink.Route{
+			LinkIndex: netInterface.Attrs().Index,
+			Scope: netlink.SCOPE_LINK,
+			Dst: &ip,
+		}
+
+		err := c.ns.RouteAdd(route)
+		if err != nil {
+			return err
+		}
+	}
 
 	peer.Enable = true
 	err = c.db.UpdatePeer(linkName, peerName, *peer)
