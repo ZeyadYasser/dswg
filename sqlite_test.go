@@ -48,6 +48,35 @@ func TestDBAddLinkDuplicate(t *testing.T) {
 	assert.NotNil(err)
 }
 
+func TestDBAddLinkDuplicatePeerIPs(t *testing.T) {
+	assert := assert.New(t)
+
+	db := setupDB()
+	defer db.Close()
+
+	testlink := baseLink()
+	err := db.AddLink(testlink)
+	assert.Nil(err)
+
+	addr, _ := ParseIPNet("10.9.6.2/32")
+
+	testpeer1 := basePeer()
+	testpeer1.Name = "peer1"
+	randkey, _ := ParseKey("RND1ngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
+	testpeer1.PublicKey = *randkey
+	testpeer1.AllowedIPs = []IPNet{*addr}
+	err = db.AddPeer(testlink.Name, testpeer1)
+	assert.Nil(err)
+	
+	testpeer2 := basePeer()
+	testpeer2.Name = "peer2"
+	randkey, _ = ParseKey("RND2ngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
+	testpeer2.PublicKey = *randkey
+	testpeer2.AllowedIPs = []IPNet{*addr}
+	err = db.AddPeer(testlink.Name, testpeer2)
+	assert.NotNil(err)
+}
+
 func TestDBGetLinkValid(t *testing.T) {
 	assert := assert.New(t)
 

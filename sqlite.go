@@ -292,9 +292,9 @@ func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
 
 	const insertIPStmt = `
 		INSERT INTO peer_allowed_ips
-		(ip_cidr, peer_id) VALUES (?,?)`
+		(ip_cidr, peer_id, link_id) VALUES (?,?,?)`
 	for _, ip := range peer.AllowedIPs {
-		_, err := tx.Exec(insertIPStmt, ip, peerID)
+		_, err := tx.Exec(insertIPStmt, ip, peerID, linkID)
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
 				return rollbackErr
@@ -405,9 +405,9 @@ func (db *sqliteDB) UpdatePeer(linkName, peerName string, peer Peer) error {
 	// Insert new allowed ips
 	const insertIPStmt = `
 		INSERT INTO peer_allowed_ips
-		(ip_cidr, peer_id) VALUES (?,?)`
+		(ip_cidr, peer_id, link_id) VALUES (?,?,?)`
 	for _, ip := range peer.AllowedIPs {
-		_, err := tx.Exec(insertIPStmt, ip, peerID)
+		_, err := tx.Exec(insertIPStmt, ip, peerID, linkID)
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
 				return rollbackErr

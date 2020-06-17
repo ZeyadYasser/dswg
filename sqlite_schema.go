@@ -74,8 +74,10 @@ CREATE TABLE IF NOT EXISTS [peer_allowed_ips]
 (
  [ip_cidr] 			VARCHAR NOT NULL ,
  [peer_id]      	INTEGER NOT NULL ,
-
+ [link_id]			INTEGER NOT NULL ,
 
  PRIMARY KEY([ip_cidr] , [peer_id]) ,
- FOREIGN KEY([peer_id]) REFERENCES [peers]([id]) ON DELETE CASCADE
+ FOREIGN KEY([peer_id]) REFERENCES [peers]([id]) ON DELETE CASCADE,
+ FOREIGN KEY([link_id]) REFERENCES [links]([id]) ON DELETE CASCADE,
+ UNIQUE([ip_cidr], [link_id])
 );`

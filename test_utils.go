@@ -30,8 +30,6 @@ func baseLink() Link {
 }
 
 func basePeer() Peer {
-	addr1, _ := ParseIPNet("10.9.6.2/32")
-	addr2, _ := ParseIPNet("10.9.6.10/32")
 	key, _ := ParseKey("ZOZ+ngJZ2jf+sREdOi/b0D8rTGMbcjgSA854Jn2KbzQ=")
 	dns1, _ := ParseIP("1.1.1.1")
 	endpoint, _ := ParseUDP("192.168.0.1:42064")
@@ -42,7 +40,6 @@ func basePeer() Peer {
 		PresharedKey: key,
 		Endpoint: endpoint,
 		DNS1: dns1,
-		AllowedIPs: []IPNet{*addr1, *addr2},
 	}
 }
 
