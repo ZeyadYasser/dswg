@@ -399,7 +399,23 @@ func (c *Client) DeactivatePeer(linkName, peerName string) error {
 		return err
 	}
 
-	// TODO: remove allowed IPs from routing table
+	// Remove allowed IPs from routing table
+	netInterface, err := c.ns.LinkByName(linkName)
+	if err != nil {
+		return err
+	}
+	for _, ip := range peer.AllowedIPs {
+		route := &netlink.Route{
+			LinkIndex: netInterface.Attrs().Index,
+			Scope: netlink.SCOPE_LINK,
+			Dst: &ip.IPNet,
+		}
+
+		// Fails silently, if peer does not exist.
+		// This is because DeactivePeer() could be called on peers that are not loaded.
+		// TODO : Log failed route deletions.
+		c.ns.RouteDel(route)
+	}
 
 	peer.Enable = false
 	err = c.db.UpdatePeer(linkName, peerName, *peer)

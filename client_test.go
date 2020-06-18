@@ -856,6 +856,8 @@ func TestClientDeactivatePeerValid(t *testing.T) {
 
 	testpeer := basePeer()
 	testpeer.Enable = true
+	addr, _ := ParseIPNet("10.9.6.2/32")
+	testpeer.AllowedIPs = []IPNet{*addr}
 	err = client.AddPeer(testlink.Name, testpeer)
 	assert.Nil(err)
 
@@ -870,6 +872,15 @@ func TestClientDeactivatePeerValid(t *testing.T) {
 
 	wglink, _ = client.wg.Device(testlink.Name)
 	assert.Equal(len(wglink.Peers), 0)
+
+	// Assert that peer IPs are removed to routing table
+	netInterface, _ := client.ns.LinkByName(testlink.Name)
+	routes, _ := client.ns.RouteList(netInterface, netlink.FAMILY_ALL)
+	kernelRoutes := make(map[string]bool)
+	for _, route := range routes {
+		kernelRoutes[route.Dst.String()] = true
+	}
+	assert.False(kernelRoutes["10.9.6.2/32"])
 }
 
 func TestClientUpdatePeerInvalid(t *testing.T) {
