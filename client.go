@@ -262,6 +262,8 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 	return nil
 }
 
+// Adds Peer to database.
+// If peer.Enable is set and the link is loaded we try to activate the peer.
 func (c *Client) AddPeer(linkName string, peer Peer) error {
 	if p, _ := c.db.GetPeer(linkName, peer.Name); p != nil {
 		return fmt.Errorf("Peer name \"%v\" already exists in database", peer.Name)
@@ -286,6 +288,8 @@ func (c *Client) AddPeer(linkName string, peer Peer) error {
 	return nil
 }
 
+// Removes the peer from wireguard if link is loaded and removes it from the database.
+// The peer must exist in the database.
 func (c *Client) RemovePeer(linkName, peerName string) error {
 	if c.isLoaded(linkName) {
 		err := c.DeactivatePeer(linkName, peerName)
@@ -302,6 +306,9 @@ func (c *Client) RemovePeer(linkName, peerName string) error {
 	return nil
 }
 
+// Activates peer, applies wireguard configurations and add IPs to routing table.
+// If link is not loaded in the kernel, it returns an error.
+// The peer must exist in the database.
 func (c *Client) ActivatePeer(linkName, peerName string) error {
 	if !c.isLoaded(linkName) {
 		return fmt.Errorf("Couldn't find wireguard link %v in the kernel", linkName)
@@ -365,6 +372,9 @@ func (c *Client) ActivatePeer(linkName, peerName string) error {
 	return nil
 }
 
+// Deactivates peer, removes peer from wireguard device and removes IPs from routing table.
+// If link is not loaded in the kernel, it returns an error.
+// The peer must exist in the database.
 func (c *Client) DeactivatePeer(linkName, peerName string) error {
 	if !c.isLoaded(linkName) {
 		return fmt.Errorf("Couldn't find wireguard link %v in the kernel", linkName)
@@ -389,6 +399,8 @@ func (c *Client) DeactivatePeer(linkName, peerName string) error {
 		return err
 	}
 
+	// TODO: remove allowed IPs from routing table
+
 	peer.Enable = false
 	err = c.db.UpdatePeer(linkName, peerName, *peer)
 	if err != nil {
@@ -398,6 +410,8 @@ func (c *Client) DeactivatePeer(linkName, peerName string) error {
 	return nil
 }
 
+// Updates peer in database and updates wireguard configurations.
+// If peer.Enable is set and link is loaded, the peer is activated.
 func (c *Client) UpdatePeer(linkName, peerName string, peer Peer) error {
 	if err := validPeer(peer); err != nil {
 		return err
