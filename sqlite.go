@@ -247,7 +247,7 @@ func (db *sqliteDB) RemoveLink(name string) error {
 		return err
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
@@ -444,7 +444,7 @@ func (db *sqliteDB) RemovePeer(linkName, peerName string) error {
 		return err
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (db *sqliteDB) Close() error {
