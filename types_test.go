@@ -59,6 +59,36 @@ func TestIPValue(t *testing.T) {
 	assert.Equal(value.(string), "10.66.94.20")
 }
 
+func TestIPUnmarshalJSONValid(t *testing.T) {
+	assert := assert.New(t)
+
+	ip := IP{}
+	err := ip.UnmarshalJSON([]byte("\"::1\""))
+	
+	assert.Nil(err)
+	assert.Equal(ip.IP, net.ParseIP("::1"))
+}
+
+func TestIPUnmarshalJSONInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	ip := IP{}
+	err := ip.UnmarshalJSON([]byte("10..2"))
+	
+	assert.NotNil(err)
+}
+
+func TestIPMarshalJSON(t *testing.T) {
+	assert := assert.New(t)
+
+	ip, err := ParseIP("10.66.94.20")
+	assert.Nil(err)
+	
+	value, err := ip.MarshalJSON() 
+	assert.Nil(err)
+	assert.Equal(string(value), "\"10.66.94.20\"")
+}
+
 func TestParseIPNetValid(t *testing.T) {
 	assert := assert.New(t)
 	
@@ -116,6 +146,38 @@ func TestIPNetValue(t *testing.T) {
 	assert.Equal(value.(string), "::1/128")
 }
 
+func TestIPNetUnmarshalJSONValid(t *testing.T) {
+	assert := assert.New(t)
+
+	ip := IPNet{}
+	err := ip.UnmarshalJSON([]byte("\"::1/128\""))
+	
+	expected, _ := netlink.ParseIPNet("::1/128")
+
+	assert.Nil(err)
+	assert.Equal(ip.IPNet, *expected)
+}
+
+func TestIPNetUnmarshalJSONInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	ip := IPNet{}
+	err := ip.UnmarshalJSON([]byte("::1")) // not / at the end for mask
+	
+	assert.NotNil(err)
+}
+
+func TestIPNetMarshalJSON(t *testing.T) {
+	assert := assert.New(t)
+
+	ip, err := ParseIPNet("::1/128")
+	assert.Nil(err)
+	
+	value, err := ip.MarshalJSON() 
+	assert.Nil(err)
+	assert.Equal(string(value), "\"::1/128\"")
+}
+
 func TestParseKeyValid(t *testing.T) {
 	assert := assert.New(t)
 	
@@ -167,6 +229,38 @@ func TestKeyValue(t *testing.T) {
 	assert.Equal(value.(string), "GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=")
 }
 
+func TestKeyUnmarshalJSONValid(t *testing.T) {
+	assert := assert.New(t)
+
+	key := Key{}
+	err := key.UnmarshalJSON([]byte("\"GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=\""))
+	assert.Nil(err)
+
+	expectedKey, err := wgtypes.ParseKey("GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=")
+
+	assert.Nil(err)
+	assert.Equal(key.Key, expectedKey)
+}
+
+func TestKeyUnmarshalJSONInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	key := Key{}
+	err := key.UnmarshalJSON([]byte("\"x\""))
+	
+	assert.NotNil(err)
+}
+
+func TestKeyMarshalJSON(t *testing.T) {
+	assert := assert.New(t)
+
+	key, err := ParseKey("GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=")
+	assert.Nil(err)
+	
+	value, err := key.MarshalJSON() 
+	assert.Nil(err)
+	assert.Equal(string(value), "\"GK3G63/XzfzGbpeMVAKgurB8hH+R3GXtwNv15owGoXc=\"")
+}
 
 func TestParseUDPAddrValid(t *testing.T) {
 	assert := assert.New(t)
@@ -218,4 +312,35 @@ func TestUDPAddrValue(t *testing.T) {
 	value, err := udp.Value() 
 	assert.Nil(err)
 	assert.Equal(value.(string), "10.66.0.1:420")
+}
+
+func TestUDPAddrUnmarshalJSONValid(t *testing.T) {
+	assert := assert.New(t)
+
+	udp := UDPAddr{}
+	err := udp.UnmarshalJSON([]byte("\"192.168.0.69:89\""))
+	assert.Nil(err)
+
+	udpExpected, err := net.ResolveUDPAddr("udp", "192.168.0.69:89")
+
+	assert.Equal(udp.UDPAddr, *udpExpected)
+}
+
+func TestUDPAddrUnmarshalJSONInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	udp := UDPAddr{}
+	err := udp.UnmarshalJSON([]byte("\"192.168.0.69"))
+	assert.NotNil(err)
+}
+
+func TestUDPAddrMarshalJSON(t *testing.T) {
+	assert := assert.New(t)
+
+	udp, err := ParseUDP("10.66.0.1:420")
+	assert.Nil(err)
+	
+	value, err := udp.MarshalJSON() 
+	assert.Nil(err)
+	assert.Equal(string(value), "\"10.66.0.1:420\"")
 }
