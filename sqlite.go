@@ -123,6 +123,26 @@ func (db *sqliteDB) GetLink(name string) (*Link, error) {
 	return &link, nil
 }
 
+func (db *sqliteDB) GetLinks() ([]Link, error) {
+	var linkNames []string
+	const selectLinkNamesStmt = "SELECT name FROM links"
+	err := db.conn.Select(&linkNames, selectLinkNamesStmt)
+	if err != nil {
+		return nil, err
+	}
+
+	links := make([]Link, len(linkNames))
+	for i, linkName := range linkNames {
+		link, err := db.GetLink(linkName)
+		if err != nil {
+			return nil, err
+		}
+		links[i] = *link
+	}
+
+	return links, nil
+}
+
 func (db *sqliteDB) GetLinkPeers(name string) ([]Peer, error) {
 	linkID, err := getLinkID(name, db.conn)
 	if err != nil {

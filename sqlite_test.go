@@ -105,6 +105,35 @@ func TestDBGetLinkNotExist(t *testing.T) {
 	assert.Nil(link)
 }
 
+func TestDBGetLinksValid(t *testing.T) {
+	assert := assert.New(t)
+
+	db := setupDB()
+	defer db.Close()
+
+	testlink1 := baseLink()
+	testlink1.Name = "link1"
+	err := db.AddLink(testlink1)
+	assert.Nil(err)
+
+	testlink2 := baseLink()
+	testlink2.Name = "link2"
+	err = db.AddLink(testlink2)
+	assert.Nil(err)
+
+	dblinks, err := db.GetLinks()
+	assert.Nil(err)
+	assert.Equal(len(dblinks), 2)
+
+	links := make(map[string]Link)
+	for _, link := range dblinks {
+		links[link.Name] = link
+	}
+
+	assert.Equal(testlink1, links["link1"])
+	assert.Equal(testlink2, links["link2"])
+}
+
 func TestDBGetLinkPeersValid(t *testing.T) {
 	assert := assert.New(t)
 
