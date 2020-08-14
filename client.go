@@ -17,6 +17,8 @@ type Client struct {
 	ns	*netlink.Handle
 }
 
+// TODO: Add extensive logging.
+// TODO: Add GetLink, GetPeer functions, to attach system related status of these entities.
 
 // Adds link to database.
 // If link.Enable is set we try to activate the link
@@ -252,6 +254,8 @@ func (c *Client) setLinkSystemConfig(name string, link Link) error {
 		return err
 	}
 
+	// TODO: Enable link forwarding, if Forward flag is set
+
 	if link.Enable {
 		err := c.ns.LinkSetUp(netInterface)
 		if err != nil {
@@ -463,6 +467,9 @@ func validLink(link Link) error {
 	if link.AddressIPv4 == nil && link.AddressIPv6 == nil {
 		return errors.New("Link must be assigned at least one address address")
 	}
+
+	// TODO: Validate minimum MTU
+	// TODO: Validate all fields
 
 	return nil
 }

@@ -248,13 +248,13 @@ func (link Link) Type() string {
 
 // FUTURE FEATURE: Add postup & postdown cmds for peers
 type Peer struct {
-	Name				string		`db:"name"`
-	Enable				bool		`db:"enable"`
-	PublicKey			Key			`db:"public_key"`
-	PresharedKey		*Key		`db:"preshared_key"`
-	Endpoint			*UDPAddr	`db:"endpoint"`
-	AllowedIPs			[]IPNet
-	PersistentKeepalive	int64		`db:"keepalive"`
-	DNS1				*IP			`db:"dns1"`
-	DNS2				*IP			`db:"dns2"`
+	Name				string		`db:"name" json:"name"`
+	Enable				bool		`db:"enable" json:"enable"`
+	PublicKey			Key			`db:"public_key" json:"public_key"`
+	PresharedKey		*Key		`db:"preshared_key" json:"preshared_key"`
+	Endpoint			*UDPAddr	`db:"endpoint" json:"endpoint"`
+	AllowedIPs			[]IPNet		`json:"allowed_ips"`
+	PersistentKeepalive	int64		`db:"keepalive" json:"keepalive"`
+	DNS1				*IP			`db:"dns1" json:"dns1"`
+	DNS2				*IP			`db:"dns2" json:"dns2"`
 }
