@@ -251,6 +251,7 @@ type Peer struct {
 	Name				string		`db:"name" json:"name"`
 	Enable				bool		`db:"enable" json:"enable"`
 	PublicKey			Key			`db:"public_key" json:"public_key"`
+	PrivateKey			*Key		`db:"private_key" json:"private_key"`
 	PresharedKey		*Key		`db:"preshared_key" json:"preshared_key"`
 	Endpoint			*UDPAddr	`db:"endpoint" json:"endpoint"`
 	AllowedIPs			[]IPNet		`json:"allowed_ips"`

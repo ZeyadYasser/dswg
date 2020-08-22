@@ -284,13 +284,13 @@ func (db *sqliteDB) AddPeer(linkName string, peer Peer) error {
 	// Last position is for the link ID
 	const insertPeerStmt = `
 		INSERT INTO peers (
-			name, enable, public_key,
-			preshared_key, endpoint,
-			keepalive, dns1, dns2, link_id
+			name, enable, public_key, private_key,
+			preshared_key, endpoint, keepalive,
+			dns1, dns2, link_id
 		) VALUES (
-			:name, :enable, :public_key,
-			:preshared_key, :endpoint,
-			:keepalive, :dns1, :dns2, ?)`
+			:name, :enable, :public_key, :private_key,
+			:preshared_key, :endpoint, :keepalive,
+			:dns1, :dns2, ?)`
 	query, args, err := sqlx.Named(insertPeerStmt, &peer)
 	if err != nil {
 		return err
@@ -334,7 +334,7 @@ func (db *sqliteDB) GetPeer(linkName, peerName string) (*Peer, error) {
 
 	const selectPeerStmt = `
 		SELECT
-			name, enable, public_key,
+			name, enable, public_key, private_key,
 			preshared_key, endpoint,
 			keepalive, dns1, dns2
 		FROM peers

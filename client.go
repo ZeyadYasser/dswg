@@ -273,6 +273,10 @@ func (c *Client) AddPeer(linkName string, peer Peer) error {
 		return fmt.Errorf("Peer name \"%v\" already exists in database", peer.Name)
 	}
 
+	if peer.PrivateKey != nil {
+		peer.PublicKey.Key = peer.PrivateKey.PublicKey()
+	}
+
 	if err := validPeer(peer); err != nil {
 		return err
 	}

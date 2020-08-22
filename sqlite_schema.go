@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS [peers]
  [name]             VARCHAR NOT NULL ,
  [enable]           INTEGER NOT NULL ,
  [public_key]       VARCHAR NOT NULL ,
+ [private_key]	    VARCHAR NULL ,
  [preshared_key]    VARCHAR NULL ,
  [endpoint]         VARCHAR NOT NULL ,
  [keepalive]        INTEGER NOT NULL ,
